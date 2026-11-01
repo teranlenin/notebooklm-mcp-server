@@ -1,0 +1,5 @@
+notebooklm-mcp-cli>=0.15.8
+fastmcp>=4.1.4
+starlette>=0.45.0
+httpx>=0.28.0
+
