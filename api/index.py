@@ -1,11 +1,26 @@
 import os
+import sys
+import tempfile
+from pathlib import Path
+
+# En entornos serverless (Vercel / AWS Lambda), el home es read-only.
+# Redirigir almacenamiento de tokens y caché al directorio temporal /tmp:
+temp_storage = os.path.join(tempfile.gettempdir(), ".notebooklm-mcp-cli")
+os.environ["NOTEBOOKLM_MCP_CLI_PATH"] = temp_storage
+os.environ["HOME"] = tempfile.gettempdir()
+try:
+    os.makedirs(temp_storage, exist_ok=True)
+except Exception:
+    pass
+
+# Asegurar URL canónica de Gemini Notebook
+if not os.environ.get("NOTEBOOKLM_BASE_URL"):
+    os.environ["NOTEBOOKLM_BASE_URL"] = "https://notebook.google.com"
+
 import asyncio
 from notebooklm_tools.mcp.server import mcp
 from starlette.responses import JSONResponse
 from starlette.routing import Route
-
-if not os.environ.get("NOTEBOOKLM_BASE_URL"):
-    os.environ["NOTEBOOKLM_BASE_URL"] = "https://notebook.google.com"
 
 raw_app = mcp.http_app(transport="streamable-http", stateless_http=True, path="/mcp")
 
@@ -36,18 +51,13 @@ class VercelServerlessASGI:
     async def __call__(self, scope, receive, send):
         if scope.get("type") == "http":
             header_dict = {k.decode("latin1").lower(): v.decode("latin1") for k, v in scope.get("headers", [])}
-            print("FULL HEADERS:", list(header_dict.keys()))
-            # Buscar header de ruta original de Vercel
             raw_path = (
                 header_dict.get("x-vercel-matched-path")
                 or header_dict.get("x-matched-path")
                 or header_dict.get("x-forwarded-uri")
-                or header_dict.get("x-now-route-matches")
                 or ""
             )
-            print(f"DETECTED PATH: raw_path={raw_path} scope_path={scope.get('path')}")
             if "mcp" in raw_path or "mcp" in header_dict.get("referer", "") or scope.get("method") == "POST":
-                # Si es un POST de MCP o la ruta contiene mcp, asignar a /mcp
                 scope["path"] = "/mcp"
             elif raw_path:
                 scope["path"] = raw_path
