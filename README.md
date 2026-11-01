@@ -15,3 +15,4 @@ Servidor MCP para conectar **Google NotebookLM** con **ChatGPT Web** ejecutándo
 - **URL del servidor:** `https://<tu-dominio>/mcp`
 - **Autenticación:** Sin autenticación
 - **Transporte:** Streamable-HTTP / SSE
+
