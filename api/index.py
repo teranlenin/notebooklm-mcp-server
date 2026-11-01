@@ -35,15 +35,23 @@ class VercelServerlessASGI:
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") == "http":
-            headers = dict(scope.get("headers", []))
-            matched_path = headers.get(b"x-matched-path", b"").decode("utf-8")
-            url_path = headers.get(b"x-forwarded-url", b"").decode("utf-8")
-            print(f"DEBUG: path={scope.get('path')} matched_path={matched_path} forwarded={url_path}")
-            
-            # Si x-matched-path está presente, ese es el path solicitado originalmente
-            if matched_path:
-                scope["path"] = matched_path
-            elif scope.get("path", "").startswith("/api/index.py"):
+            header_dict = {k.decode("latin1").lower(): v.decode("latin1") for k, v in scope.get("headers", [])}
+            print("FULL HEADERS:", list(header_dict.keys()))
+            # Buscar header de ruta original de Vercel
+            raw_path = (
+                header_dict.get("x-vercel-matched-path")
+                or header_dict.get("x-matched-path")
+                or header_dict.get("x-forwarded-uri")
+                or header_dict.get("x-now-route-matches")
+                or ""
+            )
+            print(f"DETECTED PATH: raw_path={raw_path} scope_path={scope.get('path')}")
+            if "mcp" in raw_path or "mcp" in header_dict.get("referer", "") or scope.get("method") == "POST":
+                # Si es un POST de MCP o la ruta contiene mcp, asignar a /mcp
+                scope["path"] = "/mcp"
+            elif raw_path:
+                scope["path"] = raw_path
+            else:
                 scope["path"] = "/"
 
         if not self._started:
